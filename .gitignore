@@ -37,3 +37,4 @@ datos/*
 !datos/.gitkeep
 *.xls
 *.xlsx
+src/main/resources/application.properties

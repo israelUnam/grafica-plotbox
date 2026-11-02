@@ -1,35 +1,48 @@
-# ANUIES - Tablero Estadístico de Gráficas Box Plot
+# ANUIES - Tablero Estadístico de Gráficas
 
 Sistema web desarrollado con **Spring Boot**, **Thymeleaf** y **Plotly.js** para el procesamiento, análisis y visualización de datos estadísticos institucionales de la **ANUIES** (Asociación Nacional de Universidades e Instituciones de Educación Superior).
 
-El tablero permite cargar archivos en formato CSV que contengan métricas cuantitativas agrupadas por **Región** o **Rango de Matrícula**, generando de manera automática **diagramas de caja (*Box Plots*)** y tablas interactivas de cuartiles con opciones avanzadas de exportación (SVG, PNG de alta resolución y Markdown).
+El tablero tiene dos secciones, accesibles desde la navegación del encabezado (junto al perfil del usuario):
+
+- **Diagramas de caja** (`/`): a partir de CSV con estadísticos precalculados agrupados por **Región** o **Rango de Matrícula**, genera **diagramas de caja (*Box Plots*)** y tablas de cuartiles.
+- **Diagramas de dispersión** (`/dispersion`): a partir de CSV con un registro por institución, genera **diagramas de dispersión** coloreados por grupo, con resumen estadístico por grupo.
+
+Ambas secciones ofrecen exportación en SVG y PNG de alta resolución y copiado de tablas al portapapeles.
 
 ---
 
 ## Características Principales
 
-- **Visualización Estadística Avanzada:**
-  - Generación dinámica de diagramas de caja (*Box Plots*) con rango intercuartílico ($Q1 - Q3$), mediana, media aritmética punteada y rango total (mínimo a máximo).
+- **Diagramas de caja (*Box Plots*):**
+  - Generación dinámica con rango intercuartílico ($Q1 - Q3$), mediana, media aritmética punteada y rango total (mínimo a máximo), con leyenda explicativa.
   - **Detección inteligente de escala:** Aplica escala logarítmica decimal (base 10) por defecto para datos con alta dispersión, o escala lineal automática cuando existen valores iguales a cero o cuando se especifica la palabra clave `dec` en el título del reporte.
+  - Tabla de cuartiles con copia al portapapeles y generador de tablas en formato **Markdown** (ventana modal para previsualización y copiado).
+- **Diagramas de dispersión:**
+  - Un punto por institución; color por grupo (por ejemplo, rango de matrícula) con leyenda ordenada de menor a mayor.
+  - Eje de las abscisas en escala logarítmica decimal automática cuando todos los valores son positivos.
+  - Eje de las ordenadas en escala logarítmica cuando la línea de título contiene `log -coordenadas`.
+  - Indicadores: IES graficadas, IES excluidas y coeficiente de correlación **ρ de Spearman**.
+  - Tabla por grupo con IES, Media, Mediana, Máximo, Mínimo, Q1 y Q3 (cuartiles equivalentes a `CUARTIL.INC` de Excel) y botón **Copiar tabla**.
+  - Lista desplegable de instituciones excluidas (sin dato o marcadas con 0).
 - **Gestión de Archivos CSV:**
-  - Área interactiva *Drag & Drop* para subida de archivos (límite configurable, por defecto 10 MB).
-  - Almacenamiento local configurable (directorio `./datos`).
+  - Área interactiva *Drag & Drop* en cada sección para subida de archivos (límite configurable, por defecto 10 MB).
+  - Almacenamiento local configurable con directorios separados: `./datos` (cajas) y `./datos/dispersion` (dispersión).
   - Explorador y selector rápido de archivos almacenados.
   - Opción de descarga directa del archivo CSV original desde la interfaz.
 - **Exportación de Gráficas y Datos:**
   - Exportación de gráficos en **SVG** vectorial.
-  - Exportación en **PNG** en alta resolución (2000 × 1250 px a escala 2x), optimizado para publicaciones e informes ejecutivos.
-  - Copia rápida de la tabla al portapapeles.
-  - Generador de tablas en formato **Markdown** con ventana modal para previsualización y copiado directo.
+  - Exportación en **PNG** en alta resolución (2000 × 1250 px a escala 2x), con fuentes ampliadas y la nota de escala incluida, optimizado para publicaciones e informes ejecutivos. La exportación se genera fuera de pantalla, sin alterar la gráfica visible.
+  - Copia de tablas al portapapeles en Arial 10 pt, con encabezado sombreado en gris, lista para pegar en Word o Excel.
 - **Seguridad y Control de Acceso:**
   - Autenticación mediante **Google OAuth2 / OpenID Connect (SSO)**.
   - Lista blanca (*whitelist*) de correos autorizados (`app.security.allowed-emails`).
   - Auditoría y registro detallado en consola de accesos exitosos e intentos no autorizados.
   - Soporte para proxies inversos (Nginx, Traefik, Apache con SSL/HTTPS) mediante cabeceras reenviadas.
+  - Tolerancia de hasta 1 hora de desfase de reloj al validar el ID Token de Google (evita errores `invalid_id_token` por el claim `iat`). Aun así, se recomienda sincronizar el reloj del servidor con NTP.
 
 ---
 
-## Formato del Documento CSV de Entrada
+## Formato del CSV para Diagramas de Caja
 
 El sistema implementa un analizador flexible y tolerante a variantes comunes de formato (diferentes codificaciones, delimitadores y notaciones numéricas).
 
@@ -112,6 +125,49 @@ Sur-Sureste,20,3.8,3.5,7.0,1.2,2.8,4.9
 
 ---
 
+## Formato del CSV para Diagramas de Dispersión
+
+Los archivos se cargan en la sección **Diagramas de dispersión** y se guardan en `./datos/dispersion`. Aplican las mismas reglas de delimitadores, codificación y formato de números descritas arriba.
+
+### 1. Estructura General del Archivo
+
+1. **Línea de título (opcional):** Se reconoce porque tiene menos de 4 celdas con texto. Su primer texto se usa como título del reporte. Si se omite, el título se forma con las cabeceras: `<valor Y> vs. <valor X>`.
+   > **Escala logarítmica en las ordenadas:** Si la línea de título contiene `log -coordenadas` (en cualquier celda o dentro del propio texto; no distingue mayúsculas y también acepta `log-ordenadas`), el eje $Y$ se presenta en escala logarítmica. La marca se omite del título mostrado. Las IES con valor 0 no pueden representarse en esa escala: no se dibujan, se indica cuántas son en la nota y sí se consideran en los indicadores y la tabla.
+2. **Fila de encabezados:** Al menos 4 columnas; sus nombres se usan como títulos de ejes, leyenda y tabla.
+3. **Registros de datos:** Una fila por institución.
+
+### 2. Especificación de Columnas (por posición)
+
+| Columna | Ejemplo | Tipo | Descripción |
+|---|---|---|---|
+| **1** | `Institución` | Texto | Nombre de la institución; se muestra al pasar el cursor sobre el punto. |
+| **2** | `Proyectos TI` | Numérico | Valor del eje de las ordenadas ($Y$). |
+| **3** | `Alumnos` | Numérico | Valor del eje de las abscisas ($X$). |
+| **4** | `Rango alumnos` | Texto | Grupo que define el color del punto, la leyenda y las filas de la tabla resumen. |
+| **5** *(opcional)* | `Para gráfica (1=sí)` | Marca | Si existe, solo se grafican las filas con `1`, `sí`, `si`, `x` o `true`. |
+
+Las filas marcadas con 0 o con valores no numéricos (por ejemplo, `Sin valor` o vacío) se excluyen y se listan en el apartado **Instituciones excluidas**.
+
+### 3. Ejemplos
+
+#### Ejemplo A: Sin línea de título
+```csv
+Institución,Proyectos TI,Alumnos,Rango alumnos,Para gráfica (1=sí)
+Benemérita Universidad Autónoma de Puebla,40,124312,50000 o más,1
+"El Colegio de México, A.C.",43,487,Menos de 1000,1
+Escuela Normal de Zumpango,Sin valor,291,Menos de 1000,0
+```
+
+#### Ejemplo B: Con título y escala logarítmica en las ordenadas
+```csv
+Proyectos TI por matrícula,log -coordenadas,,,
+Institución,Proyectos TI,Alumnos,Rango alumnos,Para gráfica (1=sí)
+Instituto Politécnico Nacional,50,212911,50000 o más,1
+Universidad de Monterrey,110,22618,12000 a 49999,1
+```
+
+---
+
 ## Pila Tecnológica (*Tech Stack*)
 
 - **Lenguaje:** Java 17
@@ -131,12 +187,13 @@ Sur-Sureste,20,3.8,3.5,7.0,1.2,2.8,4.9
 
 ## Configuración y Variables de Entorno
 
-La configuración principal se encuentra en [`src/main/resources/application.properties`](src/main/resources/application.properties). Las principales propiedades configurables son:
+La configuración principal se encuentra en `src/main/resources/application.properties`, que no se versiona; la plantilla es [`application.properties.example`](src/main/resources/application.properties.example). Las principales propiedades configurables son:
 
 | Propiedad | Valor por Defecto | Descripción |
 |---|---|---|
 | `server.port` | `17006` | Puerto HTTP en el que se ejecuta la aplicación. |
-| `app.storage.path` | `./datos` | Ruta local del directorio de almacenamiento de archivos CSV. |
+| `app.storage.path` | `./datos` | Ruta local del directorio de almacenamiento de archivos CSV de diagramas de caja. |
+| `app.storage.dispersion-path` | `./datos/dispersion` | Ruta local del directorio de archivos CSV de diagramas de dispersión. Si no se define, se usa `${app.storage.path}/dispersion`. |
 | `spring.servlet.multipart.max-file-size` | `10MB` | Tamaño máximo permitido por archivo subido. |
 | `spring.security.oauth2.client.registration.google.client-id` | `${GOOGLE_CLIENT_ID}` | Client ID de Google Cloud Console (variable de entorno `GOOGLE_CLIENT_ID`). |
 | `spring.security.oauth2.client.registration.google.client-secret` | `${GOOGLE_CLIENT_SECRET}` | Client Secret de Google Cloud Console (variable de entorno `GOOGLE_CLIENT_SECRET`). |
@@ -163,7 +220,15 @@ git clone <URL_DEL_REPOSITORIO>
 cd graficas
 ```
 
-### 2. Ejecutar en modo desarrollo
+### 2. Crear el archivo de configuración
+
+`application.properties` no se versiona (está en `.gitignore`). Créelo a partir de la plantilla y complete las credenciales de Google y los correos autorizados:
+
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
+```
+
+### 3. Ejecutar en modo desarrollo
 
 En Windows:
 ```powershell
@@ -175,10 +240,10 @@ En Linux / macOS:
 ./mvnw spring-boot:run
 ```
 
-### 3. Compilar paquete ejecutable para producción
+### 4. Compilar paquete ejecutable para producción
 ```bash
 ./mvnw clean package -DskipTests
-java -jar target/graficas-0.0.1-SNAPSHOT.jar
+java -jar target/graficas-0.1.0.jar
 ```
 
 Una vez iniciado el servicio, acceda desde su navegador a:
@@ -188,7 +253,19 @@ http://localhost:17006
 
 ---
 
-## Endpoints de la API REST
+## Endpoints
+
+Todas las rutas, excepto `/login` y los recursos estáticos, requieren sesión iniciada con Google.
+
+### Vistas
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/` | Sección **Diagramas de caja**. |
+| `GET` | `/dispersion` | Sección **Diagramas de dispersión**. |
+| `GET` | `/login` | Página de inicio de sesión. |
+
+### API de diagramas de caja
 
 | Método | Endpoint | Descripción |
 |---|---|---|
@@ -197,27 +274,42 @@ http://localhost:17006
 | `GET` | `/api/archivos/{nombreArchivo}` | Obtiene en formato JSON la estructura analizada del archivo (`ReporteDto`), incluyendo título, categoría y lista de registros con sus cuartiles. |
 | `GET` | `/api/archivos/{nombreArchivo}/descargar` | Descarga el archivo CSV original como archivo adjunto (`Content-Disposition: attachment`). |
 
+### API de diagramas de dispersión
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/api/dispersion/upload` | Carga un archivo CSV de dispersión (`multipart/form-data`, campo `file`). |
+| `GET` | `/api/dispersion` | Devuelve el listado en JSON de los archivos `.csv` del directorio de dispersión. |
+| `GET` | `/api/dispersion/{nombreArchivo}` | Obtiene el archivo analizado (`DispersionDto`): título, etiquetas de ejes y grupo, grupos ordenados, puntos, instituciones excluidas y si las ordenadas usan escala logarítmica (`escalaLogY`). |
+| `GET` | `/api/dispersion/{nombreArchivo}/descargar` | Descarga el archivo CSV original como adjunto. |
+
 ---
 
 ## Estructura del Proyecto
 
 ```text
 graficas/
-├── datos/                               # Directorio de almacenamiento de datasets CSV
+├── datos/                               # Datasets CSV de diagramas de caja
+│   └── dispersion/                      # Datasets CSV de diagramas de dispersión
 ├── src/
 │   ├── main/
 │   │   ├── java/mx/unam/anuies/graficas/
-│   │   │   ├── config/                  # Seguridad (SecurityConfig, filtros y JWT)
-│   │   │   ├── controller/              # CsvApiController, DashboardController, LoginController
-│   │   │   ├── dto/                     # RegistroRegionDto, ReporteDto, ErrorResponseDto
+│   │   │   ├── config/                  # Seguridad (SecurityConfig, validación del ID Token)
+│   │   │   ├── controller/              # DashboardController (vistas), CsvApiController,
+│   │   │   │                            # DispersionApiController, LoginController
+│   │   │   ├── dto/                     # ReporteDto, RegistroRegionDto, DispersionDto,
+│   │   │   │                            # PuntoDispersionDto, ErrorResponseDto
 │   │   │   ├── exception/               # Manejador global y excepciones de CSV
 │   │   │   ├── security/                # Autenticación Google OAuth2 / OIDC y lista blanca
-│   │   │   ├── service/                 # CsvStorageService (parseo, validación y almacenamiento)
+│   │   │   ├── service/                 # CsvStorageService (cajas) y DispersionStorageService
 │   │   │   └── GraficasApplication.java # Clase principal Spring Boot
 │   │   └── resources/
 │   │       ├── application.properties   # Configuración de puertos, storage y OAuth2
-│   │       ├── static/                  # Estilos CSS y lógica JS de Plotly
-│   │       └── templates/               # Vistas Thymeleaf (index.html, login.html)
+│   │       ├── static/
+│   │       │   ├── css/dashboard.css    # Estilos compartidos
+│   │       │   └── js/                  # dashboard.js (cajas) y dispersion.js (dispersión)
+│   │       └── templates/               # index.html, dispersion.html, login.html y
+│   │                                    # fragments/header.html (encabezado y navegación)
 │   └── test/                            # Pruebas unitarias y de integración
 ├── pom.xml                              # Configuración y dependencias Maven
 └── README.md                            # Documentación del sistema

@@ -335,7 +335,7 @@ public class CsvStorageService {
         return nombre;
     }
 
-    private Path resolverDentroDelAlmacen(String nombreArchivo) {
+    Path resolverDentroDelAlmacen(String nombreArchivo) {
         Path destino = storagePath.resolve(nombreArchivo).normalize();
         if (!destino.startsWith(storagePath)) {
             throw new InvalidCsvException("El nombre del archivo no está permitido.");
@@ -343,7 +343,7 @@ public class CsvStorageService {
         return destino;
     }
 
-    private String leerTexto(Path archivo) {
+    String leerTexto(Path archivo) {
         try {
             byte[] bytes = Files.readAllBytes(archivo);
             return new String(bytes, detectarCharset(bytes));
@@ -370,7 +370,7 @@ public class CsvStorageService {
         }
     }
 
-    private String quitarBom(String texto) {
+    String quitarBom(String texto) {
         if (texto != null && !texto.isEmpty() && texto.charAt(0) == BOM) {
             return texto.substring(1);
         }

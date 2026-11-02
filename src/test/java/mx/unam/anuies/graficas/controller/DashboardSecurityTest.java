@@ -98,6 +98,28 @@ class DashboardSecurityTest {
     }
 
     @Test
+    void usuarioAutenticadoAccedeASeccionDeDispersion() throws Exception {
+        mockMvc.perform(get("/dispersion").with(oauth2Login()
+                .attributes(attrs -> {
+                    attrs.put("name", "Juan Perez");
+                    attrs.put("email", "juan.perez@unam.mx");
+                    attrs.put("sub", "123456789");
+                })
+                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Tablero de diagramas de dispersión")))
+                .andExpect(content().string(containsString("Diagramas de caja")))
+                .andExpect(content().string(containsString("Juan Perez")));
+    }
+
+    @Test
+    void usuarioNoAutenticadoNoAccedeADispersion() throws Exception {
+        mockMvc.perform(get("/dispersion"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
     void usuarioAutenticadoEnLoginEsRedirigidoAlDashboard() throws Exception {
         mockMvc.perform(get("/login").with(oauth2Login()
                 .attributes(attrs -> {

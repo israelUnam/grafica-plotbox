@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANUIES · Diagramas de dispersión</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dashboard.css(v=14)}">
+</head>
+
+<body>
+    <div class="app-shell">
+        <header th:replace="~{fragments/header :: appHeader('Tablero de diagramas de dispersión', 'dispersion')}"></header>
+
+        <main class="split-view">
+            <aside class="panel panel-left">
+                <section class="panel-block">
+                    <h2>Archivos CSV</h2>
+                    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+                        aria-label="Arrastre un archivo CSV o haga clic para examinar">
+                        <input id="file-input" type="file" accept=".csv,text/csv" hidden>
+                        <div class="dropzone-icon" aria-hidden="true">↑</div>
+                        <p class="dropzone-title">Arrastre un archivo .csv</p>
+                        <p class="dropzone-sub">o haga clic para examinar · máximo 10 MB</p>
+                    </div>
+                    <p id="upload-status" class="status-line" role="status"></p>
+                </section>
+
+                <section class="panel-block">
+                    <div class="list-heading">
+                        <h3>Disponibles en ./datos/dispersion</h3>
+                        <span id="file-count" class="badge-count" th:text="${#lists.size(archivos)}">0</span>
+                    </div>
+                    <ul id="file-list" class="file-list">
+                        <li th:if="${#lists.isEmpty(archivos)}" class="empty-item">No hay archivos CSV todavía.</li>
+                        <li th:each="archivo : ${archivos}" class="file-entry">
+                            <a class="btn-file-download"
+                                th:href="@{'/api/dispersion/' + ${archivo} + '/descargar'}"
+                                th:download="${archivo}"
+                                th:title="'Descargar ' + ${archivo}"
+                                th:aria-label="'Descargar ' + ${archivo}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </a>
+                            <button type="button" class="file-item" th:data-nombre="${archivo}"
+                                th:title="${archivo}" th:text="${archivo}">archivo.csv</button>
+                        </li>
+                    </ul>
+                </section>
+            </aside>
+
+            <section class="panel panel-right">
+                <div id="empty-state" class="empty-state">
+                    <h2>Seleccione un dataset</h2>
+                    <p>Elija un archivo de la lista o cargue uno nuevo para generar el diagrama de dispersión.</p>
+                    <p class="report-file">Formato: Nombre, valor Y, valor X, grupo, marca para graficar (1=sí).</p>
+                </div>
+
+                <div id="report-view" class="report-view d-none">
+                    <header class="report-header">
+                        <div>
+                            <p class="eyebrow">Reporte seleccionado</p>
+                            <h2 id="report-title">Título del reporte</h2>
+                            <p id="report-file" class="report-file"></p>
+                        </div>
+                        <div class="export-actions">
+                            <button id="download-svg" type="button" class="btn-export">Descargar SVG</button>
+                            <button id="download-png" type="button" class="btn-export btn-export-secondary">Descargar
+                                PNG</button>
+                        </div>
+                    </header>
+                    <div id="scatter-stats" class="scatter-stats"></div>
+                    <div id="scatter" class="boxplot"></div>
+                    <p class="chart-footnote"><em>Nota.</em> El eje de las abscisas se presenta en escala
+                        logarítmica decimal (base 10).</p>
+                    <div class="table-panel">
+                        <div class="table-toolbar">
+                            <button id="copy-table" type="button" class="btn-export btn-export-secondary">Copiar
+                                tabla</button>
+                        </div>
+                        <div class="table-wrap table-responsive">
+                            <table id="summary-table" class="table table-data align-middle">
+                                <thead>
+                                    <tr class="table-columns">
+                                        <th id="th-grupo">Grupo</th>
+                                        <th class="col-cantidad">IES</th>
+                                        <th class="col-cantidad">Media</th>
+                                        <th class="col-cantidad">Mediana</th>
+                                        <th class="col-cantidad">Máximo</th>
+                                        <th class="col-cantidad">Mínimo</th>
+                                        <th class="col-cantidad">Q1</th>
+                                        <th class="col-cantidad">Q3</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="summary-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <details id="excluded-panel" class="excluded-panel d-none">
+                        <summary id="excluded-summary">Instituciones excluidas</summary>
+                        <ul id="excluded-list"></ul>
+                    </details>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script th:src="@{/js/dispersion.js(v=8)}"></script>
+</body>
+
+</html>
